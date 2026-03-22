@@ -1,0 +1,40 @@
+# Binaries (root only)
+/fox
+/fox.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build
+/build/
+/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys (NEVER commit)
+*.pem
+*.key
+*.priv
+signing-key*
+
+# Models (too large for git)
+models/*.onnx
+models/*.bin
+
+# Test
+coverage.out
+*.test
+
+# Environment
+.env
+.env.*
