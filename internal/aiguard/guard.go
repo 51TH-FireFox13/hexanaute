@@ -15,6 +15,9 @@ const (
 	ThreatKeylogger    ThreatCategory = "keylogger"
 	ThreatExfiltration ThreatCategory = "exfiltration"
 	ThreatObfuscated   ThreatCategory = "obfuscated"
+	ThreatRedirect     ThreatCategory = "redirect"
+	ThreatFingerprint  ThreatCategory = "fingerprint"
+	ThreatFormHijack   ThreatCategory = "formhijack"
 )
 
 // AnalysisResult est le résultat de l'analyse IA d'un script.
@@ -23,12 +26,23 @@ type AnalysisResult struct {
 	Category ThreatCategory
 	Details  string
 	Blocked  bool
+	Alerts   []Alert
+}
+
+// Alert est une alerte individuelle détectée.
+type Alert struct {
+	Category ThreatCategory
+	Pattern  string
+	Score    float32
+	Context  string
 }
 
 // Guard est le gardien IA du navigateur.
 type Guard struct {
-	threshold float32 // score au-dessus duquel on bloque
-	npuAvail  bool    // NPU détecté et disponible
+	threshold float32
+	npuAvail  bool
+	analyzer  *ScriptAnalyzer
+	domGuard  *DOMAnalyzer
 }
 
 // NewGuard crée un nouveau gardien IA.
@@ -43,55 +57,72 @@ func NewGuard(threshold float32) *Guard {
 	return &Guard{
 		threshold: threshold,
 		npuAvail:  npu,
+		analyzer:  NewScriptAnalyzer(),
+		domGuard:  NewDOMAnalyzer(),
 	}
 }
 
-// AnalyzeScript analyse un script JavaScript et retourne un score de risque.
-// TODO: intégrer ONNX Runtime pour l'inférence réelle sur NPU.
-func (g *Guard) AnalyzeScript(scriptContent []byte, sourceURL string) *AnalysisResult {
-	// Phase 0 : analyse heuristique basique
-	// Sera remplacé par l'inférence ONNX sur NPU en Phase 1
+// AnalyzePage analyse une page complète (HTML + scripts) et retourne un score de risque.
+func (g *Guard) AnalyzePage(htmlContent []byte, sourceURL string) *AnalysisResult {
 	result := &AnalysisResult{
 		Score:    0.0,
 		Category: ThreatNone,
+		Alerts:   make([]Alert, 0),
 	}
 
-	// Heuristiques simples en attendant le modèle
-	content := string(scriptContent)
-	patterns := map[string]ThreatCategory{
-		"eval(atob(":    ThreatObfuscated,
-		"document.cookie": ThreatExfiltration,
-		"CoinHive":      ThreatCryptoMiner,
-		"keydown":       ThreatKeylogger, // faux positif possible, le modèle IA fera mieux
+	// 1. Extraire et analyser les scripts inline
+	scripts := ExtractScripts(htmlContent)
+	for _, script := range scripts {
+		alerts := g.analyzer.Analyze(script, sourceURL)
+		result.Alerts = append(result.Alerts, alerts...)
 	}
 
-	for pattern, category := range patterns {
-		if containsPattern(content, pattern) {
-			result.Score += 0.3
-			result.Category = category
+	// 2. Analyser le DOM pour le phishing et le formjacking
+	domAlerts := g.domGuard.Analyze(htmlContent, sourceURL)
+	result.Alerts = append(result.Alerts, domAlerts...)
+
+	// 3. Calculer le score final pondéré
+	if len(result.Alerts) > 0 {
+		var maxScore float32
+		maxCategory := ThreatNone
+
+		for _, alert := range result.Alerts {
+			result.Score += alert.Score
+			if alert.Score > maxScore {
+				maxScore = alert.Score
+				maxCategory = alert.Category
+			}
 		}
-	}
 
-	if result.Score > 1.0 {
-		result.Score = 1.0
+		// Plafonner à 1.0
+		if result.Score > 1.0 {
+			result.Score = 1.0
+		}
+
+		result.Category = maxCategory
+
+		// Construire le détail
+		details := ""
+		for _, alert := range result.Alerts {
+			if details != "" {
+				details += " | "
+			}
+			details += fmt.Sprintf("%s: %s", alert.Category, alert.Pattern)
+		}
+		result.Details = details
 	}
 
 	result.Blocked = result.Score >= g.threshold
 	return result
 }
 
-func containsPattern(content, pattern string) bool {
-	for i := 0; i <= len(content)-len(pattern); i++ {
-		if content[i:i+len(pattern)] == pattern {
-			return true
-		}
-	}
-	return false
+// AnalyzeScript — rétrocompatibilité, redirige vers AnalyzePage.
+func (g *Guard) AnalyzeScript(content []byte, sourceURL string) *AnalysisResult {
+	return g.AnalyzePage(content, sourceURL)
 }
 
 // detectNPU tente de détecter un NPU disponible.
 // TODO: implémenter la détection réelle via sysfs (Linux) ou DirectML (Windows).
 func detectNPU() bool {
-	// Stub — sera implémenté avec les bindings ONNX Runtime
 	return false
 }
