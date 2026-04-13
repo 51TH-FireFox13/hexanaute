@@ -118,6 +118,7 @@ func (e *Engine) Execute(scripts []string, baseURL string, root *engine.Element)
 	runTimers := setupTimers(vm, e.config.MaxCallbacks)
 	setupWindow(vm, baseURL, result, e.config.AllowRedirect)
 	setupDocument(vm, root, baseURL, result)
+	setupCreepJSDefenses(vm) // anti-fingerprinting CreepJS (canvas, webgl, audio, observers, workers)
 
 	// Exécuter les scripts en ordre
 	for i := 0; i < max; i++ {
