@@ -237,6 +237,12 @@ func hasClass(el *Element, class string) bool {
 	return false
 }
 
+// WalkElements parcourt l'arbre en profondeur (export public).
+// La fonction fn reçoit chaque élément ; retourner false interrompt la traversée.
+func WalkElements(root *Element, fn func(*Element) bool) bool {
+	return walkElements(root, fn)
+}
+
 // walkElements parcourt l'arbre en profondeur, s'arrête si fn retourne false.
 func walkElements(root *Element, fn func(*Element) bool) bool {
 	if root == nil {

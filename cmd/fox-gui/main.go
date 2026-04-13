@@ -22,6 +22,7 @@ import (
 
 	"github.com/51TH-FireFox13/fox-browser/internal/aiguard"
 	"github.com/51TH-FireFox13/fox-browser/internal/browser"
+	"github.com/51TH-FireFox13/fox-browser/internal/css"
 	"github.com/51TH-FireFox13/fox-browser/internal/engine"
 	"github.com/51TH-FireFox13/fox-browser/internal/foxchain"
 	"github.com/51TH-FireFox13/fox-browser/internal/foxota"
@@ -1076,6 +1077,21 @@ func (f *FoxGUI) navigateInTab(tab *FoxTab, input string, addHistory bool) {
 				pageTitle = parsed.Hostname()
 			} else {
 				pageTitle = tab.pageURL
+			}
+		}
+
+		// ── CSS Engine ──
+		// Résoudre les styles CSS avant JS (les mutations JS peuvent en dépendre)
+		{
+			cssTexts := css.ExtractStyleSheets(doc)
+			cssSheets := make([]*css.StyleSheet, 0, len(cssTexts))
+			for _, text := range cssTexts {
+				cssSheets = append(cssSheets, css.ParseSheet(text))
+			}
+			css.ResolveStyles(doc, cssSheets)
+			if f.currentFoxTab() == tab && len(cssSheets) > 0 {
+				cssSummary := fmt.Sprintf(" | CSS: %d feuilles", len(cssSheets))
+				f.statusLabel.SetText(f.statusLabel.Text + cssSummary)
 			}
 		}
 

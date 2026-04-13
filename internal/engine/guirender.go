@@ -2,6 +2,8 @@ package engine
 
 import (
 	"fmt"
+	"image/color"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +13,20 @@ type RichSegment struct {
 	Style  SegmentStyle
 	Link   string // URL si c'est un lien
 	LinkID int    // index du lien
+
+	// Couleurs CSS calculées (data-fox-fg / data-fox-bg)
+	Color      color.NRGBA
+	HasColor   bool
+	BGColor    color.NRGBA
+	HasBGColor bool
+
+	// Style CSS calculé (data-fox-bold / data-fox-italic / data-fox-mono)
+	Bold bool
+	Italic bool
+	Mono bool
+
+	// Taille de police CSS (data-fox-size, en px)
+	FontSize float32
 }
 
 // SegmentStyle définit le style d'un segment.
@@ -43,6 +59,15 @@ type GUIBlock struct {
 	Segments []RichSegment
 	Children []GUIBlock // pour les sous-listes et tableaux
 	Indent   int
+
+	// Couleurs CSS du bloc (data-fox-fg / data-fox-bg)
+	FGColor    color.NRGBA
+	HasFGColor bool
+	BGColor    color.NRGBA
+	HasBGColor bool
+
+	// Alignement texte CSS (data-fox-align : left/center/right/justify)
+	Align string
 }
 
 // BlockStyleType définit le type de bloc.
@@ -114,7 +139,9 @@ func (gr *guiRenderer) render(el *Element) {
 	case "p":
 		segs := gr.collectSegments(el)
 		if len(segs) > 0 {
-			gr.blocks = append(gr.blocks, GUIBlock{Type: BlockParagraph, Segments: segs})
+			block := GUIBlock{Type: BlockParagraph, Segments: segs}
+			readBlockAttrs(el, &block)
+			gr.blocks = append(gr.blocks, block)
 		}
 	case "ul":
 		gr.renderList(el, false)
@@ -179,15 +206,19 @@ func (gr *guiRenderer) addHeadingBlock(blockType BlockStyleType, style SegmentSt
 	if len(segs) == 0 {
 		text := guiCollectAllText(el)
 		if text != "" {
-			segs = []RichSegment{{Text: text, Style: style}}
+			seg := RichSegment{Text: text, Style: style}
+			applyAttrsToSeg(el, &seg)
+			segs = []RichSegment{seg}
 		}
 	}
-	// Forcer le style heading sur tous les segments
+	// Forcer le style heading sur tous les segments (sans écraser les couleurs CSS)
 	for i := range segs {
 		segs[i].Style = style
 	}
 	if len(segs) > 0 {
-		gr.blocks = append(gr.blocks, GUIBlock{Type: blockType, Segments: segs})
+		block := GUIBlock{Type: blockType, Segments: segs}
+		readBlockAttrs(el, &block)
+		gr.blocks = append(gr.blocks, block)
 	}
 }
 
@@ -274,7 +305,9 @@ func (gr *guiRenderer) collectSegments(el *Element) []RichSegment {
 
 	if el.Text != "" {
 		style := tagToStyle(el.Tag)
-		segs = append(segs, RichSegment{Text: el.Text, Style: style})
+		seg := RichSegment{Text: el.Text, Style: style}
+		applyAttrsToSeg(el, &seg)
+		segs = append(segs, seg)
 	}
 
 	for _, child := range el.Children {
@@ -283,6 +316,10 @@ func (gr *guiRenderer) collectSegments(el *Element) []RichSegment {
 		}
 		// Sauter les sous-listes (gérées par renderList)
 		if child.Tag == "ul" || child.Tag == "ol" {
+			continue
+		}
+		// Sauter les éléments masqués
+		if child.Attrs != nil && child.Attrs["data-fox-hidden"] == "true" {
 			continue
 		}
 		if child.Tag == "a" {
@@ -299,10 +336,12 @@ func (gr *guiRenderer) collectSegments(el *Element) []RichSegment {
 		} else if child.Tag == "button" {
 			text := guiCollectAllText(child)
 			if text != "" {
-				segs = append(segs, RichSegment{Text: "[" + text + "]", Style: StyleBold})
+				seg := RichSegment{Text: "[" + text + "]", Style: StyleBold}
+				applyAttrsToSeg(child, &seg)
+				segs = append(segs, seg)
 			}
 		} else {
-			// Inline récursif
+			// Inline récursif (les attrs sont déjà propagés aux enfants par le CSS resolver)
 			childSegs := gr.collectSegments(child)
 			segs = append(segs, childSegs...)
 		}
@@ -400,4 +439,68 @@ var guiSkipTags = map[string]bool{
 	"script": true, "style": true, "noscript": true,
 	"meta": true, "link": true, "head": true,
 	"svg": true, "iframe": true, "template": true,
+}
+
+// parseHexColor parse une couleur hexadécimale "#rrggbb" sans dépendre du package css.
+func parseHexColor(s string) (color.NRGBA, bool) {
+	s = strings.TrimPrefix(s, "#")
+	if len(s) != 6 {
+		return color.NRGBA{}, false
+	}
+	r, e1 := strconv.ParseUint(s[0:2], 16, 8)
+	g, e2 := strconv.ParseUint(s[2:4], 16, 8)
+	b, e3 := strconv.ParseUint(s[4:6], 16, 8)
+	if e1 != nil || e2 != nil || e3 != nil {
+		return color.NRGBA{}, false
+	}
+	return color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}, true
+}
+
+// applyAttrsToSeg copie les propriétés data-fox-* d'un élément dans un RichSegment.
+func applyAttrsToSeg(el *Element, seg *RichSegment) {
+	if el.Attrs == nil {
+		return
+	}
+	if fg, ok := el.Attrs["data-fox-fg"]; ok && fg != "" {
+		if c, ok2 := parseHexColor(fg); ok2 {
+			seg.Color = c
+			seg.HasColor = true
+		}
+	}
+	if el.Attrs["data-fox-bold"] == "1" {
+		seg.Bold = true
+	}
+	if el.Attrs["data-fox-italic"] == "1" {
+		seg.Italic = true
+	}
+	if el.Attrs["data-fox-mono"] == "1" {
+		seg.Mono = true
+	}
+	if sz, ok := el.Attrs["data-fox-size"]; ok && sz != "" {
+		if f, err := strconv.ParseFloat(sz, 32); err == nil {
+			seg.FontSize = float32(f)
+		}
+	}
+}
+
+// readBlockAttrs copie les propriétés CSS bloc (couleur, alignement) d'un élément.
+func readBlockAttrs(el *Element, block *GUIBlock) {
+	if el.Attrs == nil {
+		return
+	}
+	if fg, ok := el.Attrs["data-fox-fg"]; ok && fg != "" {
+		if c, ok2 := parseHexColor(fg); ok2 {
+			block.FGColor = c
+			block.HasFGColor = true
+		}
+	}
+	if bg, ok := el.Attrs["data-fox-bg"]; ok && bg != "" {
+		if c, ok2 := parseHexColor(bg); ok2 {
+			block.BGColor = c
+			block.HasBGColor = true
+		}
+	}
+	if align, ok := el.Attrs["data-fox-align"]; ok && align != "" {
+		block.Align = align
+	}
 }
