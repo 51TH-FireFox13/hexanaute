@@ -26,7 +26,7 @@ const (
 
 	// Clé publique de signature des releases (sera générée avec fox-sign genkey)
 	// Pour l'instant, placeholder — sera remplacée par la vraie clé.
-	signingPubKeyHex = ""
+	signingPubKeyHex = "ca69cb8216ba7b4f2a5198286fd62e106af21fdb0a24f16f148db567ba0a5e00"
 )
 
 var profile *foxchain.Profile
