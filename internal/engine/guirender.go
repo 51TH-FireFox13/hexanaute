@@ -57,17 +57,43 @@ const (
 type GUIBlock struct {
 	Type     BlockStyleType
 	Segments []RichSegment
-	Children []GUIBlock // pour les sous-listes et tableaux
+	Children []GUIBlock // sous-listes, tableaux, champs de formulaire
 	Indent   int
 
-	// Couleurs CSS du bloc (data-fox-fg / data-fox-bg)
+	// Couleurs CSS du bloc
 	FGColor    color.NRGBA
 	HasFGColor bool
 	BGColor    color.NRGBA
 	HasBGColor bool
 
-	// Alignement texte CSS (data-fox-align : left/center/right/justify)
+	// Alignement texte CSS
 	Align string
+
+	// ── Image ──
+	ImageSrc string
+	ImageAlt string
+
+	// ── Formulaire (BlockForm) ──
+	FormAction string
+	FormMethod string // "get" | "post"
+
+	// ── Champs de formulaire ──
+	InputType       string // "text", "password", "email", "search", "number", "checkbox", "radio", "hidden", "file"
+	InputName       string
+	InputValue      string
+	InputPlaceholder string
+	InputChecked    bool
+	InputRequired   bool
+	InputDisabled   bool
+	InputID         string
+	InputLabel      string // texte du <label> associé
+
+	// ── <select> ──
+	SelectOptions []string // textes affichés
+	SelectValues  []string // valeurs (attribut value=)
+
+	// ── <textarea> ──
+	TextareaRows int
 }
 
 // BlockStyleType définit le type de bloc.
@@ -86,6 +112,16 @@ const (
 	BlockSep
 	BlockTable
 	BlockImage
+
+	// Formulaires
+	BlockForm
+	BlockInputText     // <input type="text|email|search|number|url|tel">
+	BlockInputPassword // <input type="password">
+	BlockInputSubmit   // <input type="submit"> | <button>
+	BlockInputCheckbox // <input type="checkbox">
+	BlockInputRadio    // <input type="radio">
+	BlockSelect        // <select>
+	BlockTextarea      // <textarea>
 )
 
 // GUIRenderResult contient le rendu structuré pour le GUI.
@@ -163,21 +199,39 @@ func (gr *guiRenderer) render(el *Element) {
 	case "table":
 		gr.renderTable(el)
 	case "img":
-		alt := el.Attrs["alt"]
 		src := el.Attrs["src"]
-		if alt != "" || src != "" {
-			label := alt
-			if label == "" {
-				label = src
-			}
+		alt := el.Attrs["alt"]
+		if src != "" {
 			gr.blocks = append(gr.blocks, GUIBlock{
 				Type:     BlockImage,
-				Segments: []RichSegment{{Text: "[Image: " + label + "]", Style: StyleImage}},
+				ImageSrc: src,
+				ImageAlt: alt,
+			})
+		} else if alt != "" {
+			gr.blocks = append(gr.blocks, GUIBlock{
+				Type:     BlockImage,
+				ImageAlt: alt,
+				Segments: []RichSegment{{Text: "[Image: " + alt + "]", Style: StyleImage}},
+			})
+		}
+	case "form":
+		gr.renderForm(el)
+	case "input":
+		// <input> hors formulaire : rendu inline minimal
+		b := gr.makeInputBlock(el, "")
+		if b != nil && b.Type != BlockInputPassword {
+			gr.blocks = append(gr.blocks, *b)
+		}
+	case "button":
+		text := guiCollectAllText(el)
+		if text != "" {
+			gr.blocks = append(gr.blocks, GUIBlock{
+				Type:       BlockInputSubmit,
+				InputValue: text,
 			})
 		}
 	case "div", "section", "article", "main", "header", "footer", "nav",
-		"aside", "figure", "figcaption", "details", "summary",
-		"form", "fieldset":
+		"aside", "figure", "figcaption", "details", "summary", "fieldset":
 		// Conteneurs : rendre les enfants
 		for _, child := range el.Children {
 			gr.render(child)
@@ -398,6 +452,233 @@ func (gr *guiRenderer) inputSegment(el *Element) RichSegment {
 		}
 		return RichSegment{Text: "[" + label + "]", Style: StyleSmall}
 	}
+}
+
+// ── Formulaires ──────────────────────────────────────────────────────────────
+
+func (gr *guiRenderer) renderForm(el *Element) {
+	action := ""
+	method := "get"
+	if el.Attrs != nil {
+		action = el.Attrs["action"]
+		if m := strings.ToLower(el.Attrs["method"]); m == "post" {
+			method = "post"
+		}
+	}
+	form := GUIBlock{
+		Type:       BlockForm,
+		FormAction: action,
+		FormMethod: method,
+	}
+	gr.collectFormChildren(el, &form)
+	if len(form.Children) > 0 {
+		gr.blocks = append(gr.blocks, form)
+	}
+}
+
+// collectFormChildren parcourt récursivement un <form> et construit ses blocs enfants.
+func (gr *guiRenderer) collectFormChildren(el *Element, form *GUIBlock) {
+	// Construire une map id→label depuis cet élément
+	labels := collectLabels(el)
+
+	for _, child := range el.Children {
+		if guiSkipTags[child.Tag] {
+			continue
+		}
+		if child.Attrs != nil && child.Attrs["data-fox-hidden"] == "true" {
+			continue
+		}
+		switch child.Tag {
+		case "input":
+			b := gr.makeInputBlock(child, labels[child.Attrs["id"]])
+			if b != nil {
+				form.Children = append(form.Children, *b)
+			}
+		case "select":
+			form.Children = append(form.Children, gr.makeSelectBlock(child, labels[child.Attrs["id"]]))
+		case "textarea":
+			form.Children = append(form.Children, gr.makeTextareaBlock(child, labels[child.Attrs["id"]]))
+		case "button":
+			btnType := "submit"
+			if child.Attrs != nil {
+				if t := child.Attrs["type"]; t == "button" || t == "reset" {
+					btnType = t
+				}
+			}
+			if btnType == "submit" {
+				form.Children = append(form.Children, GUIBlock{
+					Type:         BlockInputSubmit,
+					InputName:    safeAttr(child, "name"),
+					InputValue:   guiCollectAllText(child),
+					InputDisabled: safeAttr(child, "disabled") != "",
+				})
+			}
+		case "label":
+			// Label standalone (sans for=) → texte dans le formulaire
+			if child.Attrs["for"] == "" {
+				segs := gr.collectSegments(child)
+				if len(segs) > 0 {
+					form.Children = append(form.Children, GUIBlock{
+						Type: BlockParagraph, Segments: segs,
+					})
+				}
+			}
+		default:
+			// Conteneurs (div, fieldset, p...) : récurser
+			gr.collectFormChildren(child, form)
+		}
+	}
+}
+
+func (gr *guiRenderer) makeInputBlock(el *Element, label string) *GUIBlock {
+	inputType := strings.ToLower(safeAttr(el, "type"))
+	if inputType == "" {
+		inputType = "text"
+	}
+
+	block := &GUIBlock{
+		InputName:        safeAttr(el, "name"),
+		InputValue:       safeAttr(el, "value"),
+		InputPlaceholder: safeAttr(el, "placeholder"),
+		InputChecked:     safeAttr(el, "checked") != "",
+		InputRequired:    safeAttr(el, "required") != "",
+		InputDisabled:    safeAttr(el, "disabled") != "",
+		InputID:          safeAttr(el, "id"),
+		InputLabel:       label,
+	}
+	if block.InputLabel == "" {
+		block.InputLabel = block.InputPlaceholder
+	}
+
+	switch inputType {
+	case "hidden":
+		block.Type = BlockInputText
+		block.InputType = "hidden"
+	case "password":
+		block.Type = BlockInputPassword
+		block.InputType = "password"
+	case "submit", "image":
+		block.Type = BlockInputSubmit
+		block.InputType = "submit"
+		if block.InputValue == "" {
+			block.InputValue = "Envoyer"
+		}
+	case "reset":
+		block.Type = BlockInputSubmit
+		block.InputType = "reset"
+		if block.InputValue == "" {
+			block.InputValue = "Réinitialiser"
+		}
+	case "button":
+		block.Type = BlockInputSubmit
+		block.InputType = "button"
+	case "checkbox":
+		block.Type = BlockInputCheckbox
+		block.InputType = "checkbox"
+	case "radio":
+		block.Type = BlockInputRadio
+		block.InputType = "radio"
+	case "file":
+		block.Type = BlockInputText
+		block.InputType = "file"
+		if block.InputPlaceholder == "" {
+			block.InputPlaceholder = "Choisir un fichier..."
+		}
+	default:
+		// text, email, search, number, url, tel, date, time...
+		block.Type = BlockInputText
+		block.InputType = inputType
+	}
+	return block
+}
+
+func (gr *guiRenderer) makeSelectBlock(el *Element, label string) GUIBlock {
+	block := GUIBlock{
+		Type:       BlockSelect,
+		InputName:  safeAttr(el, "name"),
+		InputID:    safeAttr(el, "id"),
+		InputLabel: label,
+		InputDisabled: safeAttr(el, "disabled") != "",
+	}
+	selectedVal := safeAttr(el, "value")
+	for _, child := range el.Children {
+		if child.Tag != "option" && child.Tag != "optgroup" {
+			continue
+		}
+		if child.Tag == "optgroup" {
+			for _, opt := range child.Children {
+				if opt.Tag == "option" {
+					addOption(&block, opt, &selectedVal)
+				}
+			}
+			continue
+		}
+		addOption(&block, child, &selectedVal)
+	}
+	block.InputValue = selectedVal
+	return block
+}
+
+func addOption(block *GUIBlock, opt *Element, selectedVal *string) {
+	text := guiCollectAllText(opt)
+	val := safeAttr(opt, "value")
+	if val == "" {
+		val = text
+	}
+	block.SelectOptions = append(block.SelectOptions, text)
+	block.SelectValues = append(block.SelectValues, val)
+	if safeAttr(opt, "selected") != "" && *selectedVal == "" {
+		*selectedVal = val
+	}
+}
+
+func (gr *guiRenderer) makeTextareaBlock(el *Element, label string) GUIBlock {
+	rows := 4
+	if r := safeAttr(el, "rows"); r != "" {
+		if n, err := strconv.Atoi(r); err == nil && n > 0 {
+			rows = n
+		}
+	}
+	return GUIBlock{
+		Type:             BlockTextarea,
+		InputName:        safeAttr(el, "name"),
+		InputValue:       guiCollectAllText(el),
+		InputPlaceholder: safeAttr(el, "placeholder"),
+		InputLabel:       label,
+		InputRequired:    safeAttr(el, "required") != "",
+		InputDisabled:    safeAttr(el, "disabled") != "",
+		InputID:          safeAttr(el, "id"),
+		TextareaRows:     rows,
+	}
+}
+
+// collectLabels construit une map id→label text depuis les <label for="id"> du formulaire.
+func collectLabels(el *Element) map[string]string {
+	labels := make(map[string]string)
+	walkLabels(el, labels)
+	return labels
+}
+
+func walkLabels(el *Element, out map[string]string) {
+	if el.Tag == "label" {
+		forID := ""
+		if el.Attrs != nil {
+			forID = el.Attrs["for"]
+		}
+		if forID != "" {
+			out[forID] = strings.TrimSpace(guiCollectAllText(el))
+		}
+	}
+	for _, child := range el.Children {
+		walkLabels(child, out)
+	}
+}
+
+func safeAttr(el *Element, key string) string {
+	if el.Attrs == nil {
+		return ""
+	}
+	return el.Attrs[key]
 }
 
 func tagToStyle(tag string) SegmentStyle {

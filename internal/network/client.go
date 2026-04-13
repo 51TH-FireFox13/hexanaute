@@ -4,6 +4,7 @@ package network
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -134,6 +135,55 @@ func (c *Client) FetchWithContext(ctx context.Context, rawURL string) (*Response
 	}
 
 	return result, nil
+}
+
+// FetchImage télécharge une ressource image et retourne ses données brutes.
+// Supporte les URLs http/https et les data: URLs inline.
+func (c *Client) FetchImage(rawURL string) ([]byte, error) {
+	// Data URL inline (e.g. data:image/png;base64,...)
+	if strings.HasPrefix(rawURL, "data:") {
+		comma := strings.IndexByte(rawURL, ',')
+		if comma < 0 {
+			return nil, fmt.Errorf("data URL invalide")
+		}
+		meta := rawURL[5:comma]
+		payload := rawURL[comma+1:]
+		if strings.Contains(meta, "base64") {
+			decoded, err := base64.StdEncoding.DecodeString(payload)
+			if err != nil {
+				// Essayer avec URLEncoding
+				decoded, err = base64.RawStdEncoding.DecodeString(payload)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return decoded, nil
+		}
+		return []byte(payload), nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "HexaNaute/0.4.0 (fr; souverain)")
+	req.Header.Set("Accept", "image/webp,image/avif,image/apng,image/*,*/*;q=0.8")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // max 10 MB
+	return body, err
 }
 
 // ClearCookies vide le cookie jar (ex : déconnexion globale).

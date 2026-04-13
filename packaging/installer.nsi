@@ -1,6 +1,6 @@
 ; ============================================================
 ;  HexaNaute — Script d'installation NSIS
-;  Génère : HexaNaute-Setup-v0.4.0.exe
+;  Génère : HexaNaute-Setup-v0.5.0.exe
 ; ============================================================
 
 Unicode True
@@ -8,7 +8,7 @@ SetCompressor /SOLID lzma
 
 ; --- Infos générales ---
 Name              "HexaNaute"
-OutFile           "HexaNaute-Setup-v0.4.0.exe"
+OutFile           "HexaNaute-Setup-v0.5.0.exe"
 InstallDir        "$PROGRAMFILES64\HexaNaute"
 InstallDirRegKey  HKLM "Software\HexaNaute" "InstallDir"
 RequestExecutionLevel admin
@@ -18,13 +18,13 @@ Icon              "..\assets\icons\fox.ico"
 UninstallIcon     "..\assets\icons\fox.ico"
 
 ; --- Infos affichées dans les propriétés ---
-VIProductVersion  "0.4.0.0"
+VIProductVersion  "0.5.0.0"
 VIAddVersionKey   "ProductName"      "HexaNaute"
-VIAddVersionKey   "ProductVersion"   "0.4.0"
+VIAddVersionKey   "ProductVersion"   "0.5.0"
 VIAddVersionKey   "FileDescription"  "Installeur HexaNaute"
 VIAddVersionKey   "CompanyName"      "HexaRelay"
 VIAddVersionKey   "LegalCopyright"   "Licence MIT"
-VIAddVersionKey   "FileVersion"      "0.4.0"
+VIAddVersionKey   "FileVersion"      "0.5.0"
 
 ; --- Interface moderne ---
 !include "MUI2.nsh"
@@ -83,14 +83,14 @@ Section "HexaNaute" SecMain
 
     ; --- Entrée registre (Ajout/Suppression de programmes) ---
     WriteRegStr HKLM "Software\HexaNaute" "InstallDir" "$INSTDIR"
-    WriteRegStr HKLM "Software\HexaNaute" "Version"    "0.4.0"
+    WriteRegStr HKLM "Software\HexaNaute" "Version"    "0.5.0"
 
     WriteRegStr HKLM \
         "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "DisplayName"          "HexaNaute"
     WriteRegStr HKLM \
         "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
-        "DisplayVersion"       "0.4.0"
+        "DisplayVersion"       "0.5.0"
     WriteRegStr HKLM \
         "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "Publisher"            "HexaRelay"

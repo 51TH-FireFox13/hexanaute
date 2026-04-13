@@ -1157,9 +1157,37 @@ func (f *FoxGUI) navigateInTab(tab *FoxTab, input string, addHistory bool) {
 		guiResult := engine.RenderForGUI(doc)
 
 		// Mettre à jour le contenu de l'onglet
-		pageView := buildPageView(guiResult, func(linkURL string) {
-			resolved := tab.session.ResolveURL(linkURL)
-			f.navigateInTab(tab, resolved, true)
+		currentTab := tab
+		currentBaseURL := tab.pageURL
+		pageView := buildPageView(guiResult, PageViewConfig{
+			BaseURL: currentBaseURL,
+			OnLinkClick: func(linkURL string) {
+				resolved := currentTab.session.ResolveURL(linkURL)
+				f.navigateInTab(currentTab, resolved, true)
+			},
+			OnFormSubmit: func(action, method string, data map[string]string) {
+				resolved := currentTab.session.ResolveURL(action)
+				if method == "post" {
+					f.navigateInTab(currentTab, resolved, true)
+				} else {
+					params := url.Values{}
+					for k, v := range data {
+						params.Set(k, v)
+					}
+					target := resolved
+					if len(params) > 0 {
+						if strings.Contains(resolved, "?") {
+							target += "&" + params.Encode()
+						} else {
+							target += "?" + params.Encode()
+						}
+					}
+					f.navigateInTab(currentTab, target, true)
+				}
+			},
+			FetchImage: func(imgURL string) ([]byte, error) {
+				return f.client.FetchImage(imgURL)
+			},
 		})
 
 		tab.contentBox.Objects = []fyne.CanvasObject{pageView}

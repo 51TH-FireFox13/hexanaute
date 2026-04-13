@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	"net/url"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -13,25 +14,30 @@ import (
 	"github.com/51TH-FireFox13/hexanaute/internal/engine"
 )
 
-// buildPageView construit une vue Fyne structurée à partir des blocs de rendu GUI.
-func buildPageView(result *engine.GUIRenderResult, onLinkClick func(url string)) fyne.CanvasObject {
-	objects := make([]fyne.CanvasObject, 0, len(result.Blocks))
+// PageViewConfig regroupe les callbacks nécessaires au rendu d'une page.
+type PageViewConfig struct {
+	OnLinkClick  func(url string)
+	OnFormSubmit func(action, method string, data map[string]string)
+	FetchImage   func(url string) ([]byte, error) // nil = pas d'images
+	BaseURL      string
+}
 
+// buildPageView construit l'arbre Fyne à partir des blocs de rendu GUI.
+func buildPageView(result *engine.GUIRenderResult, cfg PageViewConfig) fyne.CanvasObject {
+	objects := make([]fyne.CanvasObject, 0, len(result.Blocks))
 	for _, block := range result.Blocks {
-		obj := renderBlock(block, onLinkClick)
+		obj := renderBlock(block, cfg)
 		if obj != nil {
 			objects = append(objects, obj)
 		}
 	}
-
 	if len(objects) == 0 {
 		return widget.NewLabel("(page vide)")
 	}
-
 	return container.NewVBox(objects...)
 }
 
-func renderBlock(block engine.GUIBlock, onLinkClick func(string)) fyne.CanvasObject {
+func renderBlock(block engine.GUIBlock, cfg PageViewConfig) fyne.CanvasObject {
 	switch block.Type {
 	case engine.BlockHeading1:
 		return renderHeading(block, 24, true)
@@ -46,121 +52,135 @@ func renderBlock(block engine.GUIBlock, onLinkClick func(string)) fyne.CanvasObj
 		sep.StrokeWidth = 1
 		return container.NewStack(container.NewPadded(sep))
 	case engine.BlockParagraph:
-		return renderParagraph(block, onLinkClick, 0)
+		return renderParagraph(block, cfg.OnLinkClick, 0)
 	case engine.BlockList, engine.BlockOrderedList:
-		return renderParagraph(block, onLinkClick, block.Indent)
+		return renderParagraph(block, cfg.OnLinkClick, block.Indent)
 	case engine.BlockQuote:
-		return renderBlockquote(block, onLinkClick)
+		return renderBlockquote(block, cfg.OnLinkClick)
 	case engine.BlockCodeBlock:
 		return renderCodeBlock(block)
 	case engine.BlockTable:
 		return renderTableBlock(block)
 	case engine.BlockImage:
-		text := segmentsToText(block.Segments)
-		label := widget.NewLabel(text)
-		label.TextStyle = fyne.TextStyle{Italic: true}
-		return label
+		return renderImageBlock(block, cfg)
+	case engine.BlockForm:
+		return renderForm(block, cfg)
+	// Champs hors formulaire (affichage minimal)
+	case engine.BlockInputText, engine.BlockInputPassword,
+		engine.BlockInputCheckbox, engine.BlockInputRadio,
+		engine.BlockSelect, engine.BlockTextarea:
+		return renderStandaloneField(block)
+	case engine.BlockInputSubmit:
+		label := block.InputValue
+		if label == "" {
+			label = "Envoyer"
+		}
+		return widget.NewButton(label, nil)
 	default:
-		return renderParagraph(block, onLinkClick, 0)
+		return renderParagraph(block, cfg.OnLinkClick, 0)
 	}
 }
+
+// ── Headings ─────────────────────────────────────────────────────────────────
 
 func renderHeading(block engine.GUIBlock, size float32, bold bool) fyne.CanvasObject {
 	text := segmentsToText(block.Segments)
 	if text == "" {
 		return nil
 	}
-
-	// Couleur : CSS prioritaire, sinon orange Fox par défaut
 	headingColor := color.NRGBA{R: 255, G: 180, B: 50, A: 255}
 	if block.HasFGColor {
 		headingColor = block.FGColor
 	}
-
 	heading := canvas.NewText(text, headingColor)
 	heading.TextSize = size
 	heading.TextStyle = fyne.TextStyle{Bold: bold}
 
 	obj := fyne.CanvasObject(container.NewVBox(container.NewPadded(heading)))
-
-	// Fond CSS sur le bloc heading
 	if block.HasBGColor {
 		bg := canvas.NewRectangle(block.BGColor)
 		obj = container.NewStack(bg, obj)
 	}
-
 	return obj
 }
+
+// ── Paragraphes / texte riche ────────────────────────────────────────────────
 
 func renderParagraph(block engine.GUIBlock, onLinkClick func(string), indent int) fyne.CanvasObject {
 	if len(block.Segments) == 0 {
 		return nil
 	}
 
-	// Construire un RichText avec segments stylisés
-	richSegs := make([]widget.RichTextSegment, 0, len(block.Segments))
-
+	// Vérifier si le paragraphe contient des liens
+	hasLinks := false
 	for _, seg := range block.Segments {
-		if seg.Text == "" {
-			continue
+		if seg.Link != "" {
+			hasLinks = true
+			break
 		}
+	}
 
-		style := segmentToRichStyle(seg)
-
-		if seg.Link != "" && onLinkClick != nil {
-			// Lien cliquable
-			linkURL := seg.Link
-			hyperlink := widget.NewHyperlink(seg.Text, nil)
-			hyperlink.OnTapped = func() {
-				onLinkClick(linkURL)
+	var obj fyne.CanvasObject
+	if hasLinks && onLinkClick != nil {
+		// Rendu mixte : texte + boutons-liens dans un HBox
+		items := make([]fyne.CanvasObject, 0, len(block.Segments))
+		for _, seg := range block.Segments {
+			if seg.Text == "" {
+				continue
 			}
-			// Utiliser un TextSegment avec couleur pour les liens
-			richSegs = append(richSegs, &widget.TextSegment{
-				Text:  fmt.Sprintf("%s [%d]", seg.Text, seg.LinkID),
-				Style: widget.RichTextStyle{
-					Inline:    true,
-					TextStyle: fyne.TextStyle{Bold: false, Italic: false},
-					ColorName: "primary",
-				},
-			})
-		} else {
+			if seg.Link != "" {
+				linkURL := seg.Link
+				btn := widget.NewButton(fmt.Sprintf("%s [%d]", seg.Text, seg.LinkID), func() {
+					onLinkClick(linkURL)
+				})
+				btn.Importance = widget.LowImportance
+				items = append(items, btn)
+			} else {
+				lbl := widget.NewLabel(seg.Text)
+				if seg.Bold {
+					lbl.TextStyle.Bold = true
+				}
+				if seg.Italic {
+					lbl.TextStyle.Italic = true
+				}
+				items = append(items, lbl)
+			}
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		obj = container.NewHBox(items...)
+	} else {
+		// Pas de liens : rendu RichText classique
+		richSegs := make([]widget.RichTextSegment, 0, len(block.Segments))
+		for _, seg := range block.Segments {
+			if seg.Text == "" {
+				continue
+			}
 			richSegs = append(richSegs, &widget.TextSegment{
 				Text:  seg.Text,
-				Style: style,
+				Style: segmentToRichStyle(seg),
 			})
 		}
+		if len(richSegs) == 0 {
+			return nil
+		}
+		rt := widget.NewRichText(richSegs...)
+		rt.Wrapping = fyne.TextWrapWord
+		obj = rt
 	}
-
-	if len(richSegs) == 0 {
-		return nil
-	}
-
-	rt := widget.NewRichText(richSegs...)
-	rt.Wrapping = fyne.TextWrapWord
-
-	var obj fyne.CanvasObject = rt
 
 	if indent > 0 {
-		obj = container.NewHBox(
-			widget.NewLabel(strings.Repeat("  ", indent)),
-			rt,
-		)
+		obj = container.NewHBox(widget.NewLabel(strings.Repeat("  ", indent)), obj)
 	}
-
-	// Alignement CSS
 	switch block.Align {
 	case "center":
 		obj = container.NewCenter(obj)
-	case "right":
-		obj = container.NewHBox(widget.NewLabel(""), obj)
 	}
-
-	// Fond CSS du bloc
 	if block.HasBGColor {
 		bg := canvas.NewRectangle(block.BGColor)
 		obj = container.NewStack(bg, container.NewPadded(obj))
 	}
-
 	return obj
 }
 
@@ -169,13 +189,10 @@ func renderBlockquote(block engine.GUIBlock, onLinkClick func(string)) fyne.Canv
 	if text == "" {
 		return nil
 	}
-
 	bar := canvas.NewRectangle(color.NRGBA{R: 255, G: 120, B: 0, A: 200})
 	bar.SetMinSize(fyne.NewSize(3, 0))
-
 	label := widget.NewRichTextFromMarkdown("*" + text + "*")
 	label.Wrapping = fyne.TextWrapWord
-
 	return container.NewHBox(bar, container.NewPadded(label))
 }
 
@@ -184,12 +201,10 @@ func renderCodeBlock(block engine.GUIBlock) fyne.CanvasObject {
 	if text == "" {
 		return nil
 	}
-
 	bg := canvas.NewRectangle(color.NRGBA{R: 35, G: 35, B: 40, A: 255})
 	label := widget.NewLabel(text)
 	label.TextStyle = fyne.TextStyle{Monospace: true}
 	label.Wrapping = fyne.TextWrapWord
-
 	return container.NewStack(bg, container.NewPadded(label))
 }
 
@@ -197,7 +212,6 @@ func renderTableBlock(block engine.GUIBlock) fyne.CanvasObject {
 	if len(block.Children) == 0 {
 		return nil
 	}
-
 	rows := make([]fyne.CanvasObject, 0, len(block.Children))
 	for i, row := range block.Children {
 		text := segmentsToText(row.Segments)
@@ -206,7 +220,6 @@ func renderTableBlock(block engine.GUIBlock) fyne.CanvasObject {
 			label.TextStyle = fyne.TextStyle{Bold: true}
 		}
 		label.Wrapping = fyne.TextWrapWord
-
 		if i == 0 {
 			bg := canvas.NewRectangle(color.NRGBA{R: 50, G: 50, B: 55, A: 255})
 			rows = append(rows, container.NewStack(bg, container.NewPadded(label)))
@@ -214,18 +227,357 @@ func renderTableBlock(block engine.GUIBlock) fyne.CanvasObject {
 			rows = append(rows, container.NewPadded(label))
 		}
 	}
-
 	bg := canvas.NewRectangle(color.NRGBA{R: 38, G: 38, B: 43, A: 255})
 	return container.NewStack(bg, container.NewVBox(rows...))
 }
 
-func segmentToRichStyle(seg engine.RichSegment) widget.RichTextStyle {
-	style := widget.RichTextStyle{
-		Inline:    true,
-		TextStyle: fyne.TextStyle{},
+// ── Images ───────────────────────────────────────────────────────────────────
+
+func renderImageBlock(block engine.GUIBlock, cfg PageViewConfig) fyne.CanvasObject {
+	alt := block.ImageAlt
+	src := block.ImageSrc
+
+	// Pas de src → fallback texte
+	if src == "" {
+		if alt == "" {
+			return nil
+		}
+		lbl := widget.NewLabel("[Image: " + alt + "]")
+		lbl.TextStyle = fyne.TextStyle{Italic: true}
+		return lbl
 	}
 
-	// Style sémantique HTML (tag-based)
+	// Résoudre l'URL relative
+	resolvedSrc := resolveImageURL(cfg.BaseURL, src)
+
+	// Placeholder pendant le chargement
+	placeholder := canvas.NewRectangle(color.NRGBA{R: 45, G: 45, B: 50, A: 255})
+	placeholder.SetMinSize(fyne.NewSize(200, 120))
+	altLabel := widget.NewLabel("⏳ " + alt)
+	altLabel.TextStyle = fyne.TextStyle{Italic: true}
+	imgContainer := container.NewStack(placeholder, container.NewCenter(altLabel))
+
+	// Chargement asynchrone si fetchImage disponible
+	if cfg.FetchImage != nil {
+		go func() {
+			data, err := cfg.FetchImage(resolvedSrc)
+			if err != nil || len(data) == 0 {
+				altLabel.SetText("[Image: " + alt + "]")
+				return
+			}
+			r := fyne.NewStaticResource(src, data)
+			img := canvas.NewImageFromResource(r)
+			img.FillMode = canvas.ImageFillContain
+			img.SetMinSize(fyne.NewSize(300, 200))
+			imgContainer.Objects = []fyne.CanvasObject{img}
+			imgContainer.Refresh()
+		}()
+	}
+
+	return imgContainer
+}
+
+// resolveImageURL résout une URL image relative par rapport à la base page.
+func resolveImageURL(baseURL, imgSrc string) string {
+	if imgSrc == "" || strings.HasPrefix(imgSrc, "data:") {
+		return imgSrc
+	}
+	if strings.HasPrefix(imgSrc, "http://") || strings.HasPrefix(imgSrc, "https://") {
+		return imgSrc
+	}
+	if strings.HasPrefix(imgSrc, "//") {
+		if strings.HasPrefix(baseURL, "https:") {
+			return "https:" + imgSrc
+		}
+		return "http:" + imgSrc
+	}
+	base, err := url.Parse(baseURL)
+	if err != nil || base.Host == "" {
+		return imgSrc
+	}
+	ref, err := url.Parse(imgSrc)
+	if err != nil {
+		return imgSrc
+	}
+	return base.ResolveReference(ref).String()
+}
+
+// ── Formulaires ──────────────────────────────────────────────────────────────
+
+type formFieldRef struct {
+	name     string
+	kind     string // "entry", "check", "select", "textarea", "hidden"
+	entry    *widget.Entry
+	check    *widget.Check
+	sel      *widget.Select
+	hidden   string
+}
+
+func renderForm(block engine.GUIBlock, cfg PageViewConfig) fyne.CanvasObject {
+	var fields []formFieldRef
+	objects := make([]fyne.CanvasObject, 0, len(block.Children)+1)
+
+	// Séparateur visuel : ligne orange fine en haut du formulaire
+	topLine := canvas.NewRectangle(color.NRGBA{R: 255, G: 140, B: 0, A: 80})
+	topLine.SetMinSize(fyne.NewSize(0, 1))
+	objects = append(objects, topLine)
+
+	for _, child := range block.Children {
+		switch child.Type {
+		case engine.BlockInputText:
+			if child.InputType == "hidden" {
+				fields = append(fields, formFieldRef{name: child.InputName, kind: "hidden", hidden: child.InputValue})
+				continue
+			}
+			obj, ref := renderInputEntry(child)
+			if ref != nil {
+				fields = append(fields, *ref)
+			}
+			if obj != nil {
+				objects = append(objects, obj)
+			}
+
+		case engine.BlockInputPassword:
+			lbl, entry := labelledWidget(child.InputLabel, widget.NewPasswordEntry())
+			entry.SetText(child.InputValue)
+			entry.SetPlaceHolder(child.InputPlaceholder)
+			if child.InputName != "" {
+				e := entry
+				fields = append(fields, formFieldRef{name: child.InputName, kind: "entry", entry: e})
+			}
+			objects = append(objects, lbl)
+
+		case engine.BlockInputCheckbox:
+			check := widget.NewCheck(child.InputLabel, nil)
+			check.SetChecked(child.InputChecked)
+			if child.InputDisabled {
+				check.Disable()
+			}
+			if child.InputName != "" {
+				c := check
+				fields = append(fields, formFieldRef{name: child.InputName, kind: "check", check: c})
+			}
+			objects = append(objects, container.NewPadded(check))
+
+		case engine.BlockInputRadio:
+			// Radio buttons : affichage simple (sans groupement pour v0.5.0)
+			check := widget.NewCheck("◉ "+child.InputLabel, nil)
+			check.SetChecked(child.InputChecked)
+			if child.InputName != "" {
+				c := check
+				fields = append(fields, formFieldRef{name: child.InputName, kind: "check", check: c})
+			}
+			objects = append(objects, container.NewPadded(check))
+
+		case engine.BlockSelect:
+			if len(child.SelectOptions) == 0 {
+				continue
+			}
+			sel := widget.NewSelect(child.SelectOptions, nil)
+			// Sélectionner la valeur par défaut
+			if child.InputValue != "" {
+				for i, v := range child.SelectValues {
+					if v == child.InputValue && i < len(child.SelectOptions) {
+						sel.SetSelected(child.SelectOptions[i])
+						break
+					}
+				}
+			}
+			if child.InputDisabled {
+				sel.Disable()
+			}
+			if child.InputName != "" {
+				s := sel
+				sv := child.SelectValues
+				so := child.SelectOptions
+				fields = append(fields, formFieldRef{
+					name: child.InputName, kind: "select", sel: s,
+					// Pour retrouver la vraie value depuis le texte sélectionné
+					hidden: strings.Join(sv, "\x00") + "\xff" + strings.Join(so, "\x00"),
+				})
+			}
+			var lbl fyne.CanvasObject
+			if child.InputLabel != "" {
+				lbl = container.NewBorder(nil, nil, widget.NewLabel(child.InputLabel+":"), nil, sel)
+			} else {
+				lbl = sel
+			}
+			objects = append(objects, container.NewPadded(lbl))
+
+		case engine.BlockTextarea:
+			entry := widget.NewMultiLineEntry()
+			entry.SetText(child.InputValue)
+			entry.SetPlaceHolder(child.InputPlaceholder)
+			entry.SetMinRowsVisible(child.TextareaRows)
+			if child.InputDisabled {
+				entry.Disable()
+			}
+			if child.InputName != "" {
+				e := entry
+				fields = append(fields, formFieldRef{name: child.InputName, kind: "entry", entry: e})
+			}
+			var lbl fyne.CanvasObject
+			if child.InputLabel != "" {
+				lbl = container.NewBorder(widget.NewLabel(child.InputLabel+":"), nil, nil, nil, entry)
+			} else {
+				lbl = entry
+			}
+			objects = append(objects, container.NewPadded(lbl))
+
+		case engine.BlockInputSubmit:
+			label := child.InputValue
+			if label == "" {
+				label = "Envoyer"
+			}
+			if child.InputType == "reset" {
+				// Bouton reset : vider les champs (non implémenté, juste visuel)
+				resetBtn := widget.NewButton(label, nil)
+				objects = append(objects, container.NewPadded(resetBtn))
+				continue
+			}
+			capturedFields := fields // snapshot au moment de la création
+			action := block.FormAction
+			method := block.FormMethod
+			btn := widget.NewButton(label, func() {
+				if cfg.OnFormSubmit == nil {
+					return
+				}
+				data := collectFormData(capturedFields)
+				cfg.OnFormSubmit(action, method, data)
+			})
+			btn.Importance = widget.HighImportance
+			objects = append(objects, container.NewPadded(btn))
+
+		case engine.BlockParagraph:
+			// Texte (labels standalone, instructions)
+			segs := child.Segments
+			if len(segs) > 0 {
+				rt := widget.NewRichText()
+				rt.Wrapping = fyne.TextWrapWord
+				var richSegs []widget.RichTextSegment
+				for _, s := range segs {
+					if s.Text != "" {
+						richSegs = append(richSegs, &widget.TextSegment{
+							Text: s.Text, Style: segmentToRichStyle(s),
+						})
+					}
+				}
+				rt.Segments = richSegs
+				rt.Refresh()
+				objects = append(objects, rt)
+			}
+		}
+	}
+
+	if len(objects) <= 1 { // seulement la ligne orange
+		return nil
+	}
+
+	bg := canvas.NewRectangle(color.NRGBA{R: 35, G: 35, B: 42, A: 255})
+	return container.NewStack(bg, container.NewPadded(container.NewVBox(objects...)))
+}
+
+// renderInputEntry crée un widget.Entry pour un champ texte.
+func renderInputEntry(child engine.GUIBlock) (fyne.CanvasObject, *formFieldRef) {
+	entry := widget.NewEntry()
+	entry.SetText(child.InputValue)
+	entry.SetPlaceHolder(child.InputPlaceholder)
+	if child.InputDisabled {
+		entry.Disable()
+	}
+
+	var ref *formFieldRef
+	if child.InputName != "" {
+		e := entry
+		ref = &formFieldRef{name: child.InputName, kind: "entry", entry: e}
+	}
+
+	obj, _ := labelledWidget(child.InputLabel, entry)
+	return obj, ref
+}
+
+// labelledWidget crée un conteneur label + widget sur une ligne.
+func labelledWidget(label string, w fyne.CanvasObject) (fyne.CanvasObject, *widget.Entry) {
+	entry, _ := w.(*widget.Entry)
+	if label != "" {
+		lbl := widget.NewLabel(label + ":")
+		lbl.TextStyle = fyne.TextStyle{Bold: true}
+		return container.NewBorder(nil, nil, lbl, nil, w), entry
+	}
+	return container.NewPadded(w), entry
+}
+
+// collectFormData rassemble les valeurs de tous les champs au moment du submit.
+func collectFormData(fields []formFieldRef) map[string]string {
+	data := make(map[string]string, len(fields))
+	for _, f := range fields {
+		if f.name == "" {
+			continue
+		}
+		switch f.kind {
+		case "entry":
+			if f.entry != nil {
+				data[f.name] = f.entry.Text
+			}
+		case "check":
+			if f.check != nil && f.check.Checked {
+				data[f.name] = "on"
+			}
+		case "select":
+			if f.sel != nil && f.sel.Selected != "" {
+				// Retrouver la vraie value depuis le texte sélectionné
+				val := f.sel.Selected
+				if f.hidden != "" {
+					parts := strings.SplitN(f.hidden, "\xff", 2)
+					if len(parts) == 2 {
+						vals := strings.Split(parts[0], "\x00")
+						opts := strings.Split(parts[1], "\x00")
+						for i, opt := range opts {
+							if opt == val && i < len(vals) {
+								val = vals[i]
+								break
+							}
+						}
+					}
+				}
+				data[f.name] = val
+			}
+		case "hidden":
+			data[f.name] = f.hidden
+		}
+	}
+	return data
+}
+
+// renderStandaloneField affiche un champ hors formulaire.
+func renderStandaloneField(block engine.GUIBlock) fyne.CanvasObject {
+	switch block.Type {
+	case engine.BlockInputText:
+		e := widget.NewEntry()
+		e.SetPlaceHolder(block.InputPlaceholder)
+		e.SetText(block.InputValue)
+		return container.NewPadded(e)
+	case engine.BlockInputPassword:
+		e := widget.NewPasswordEntry()
+		e.SetPlaceHolder(block.InputPlaceholder)
+		return container.NewPadded(e)
+	case engine.BlockInputCheckbox:
+		return container.NewPadded(widget.NewCheck(block.InputLabel, nil))
+	case engine.BlockSelect:
+		return container.NewPadded(widget.NewSelect(block.SelectOptions, nil))
+	case engine.BlockTextarea:
+		e := widget.NewMultiLineEntry()
+		e.SetPlaceHolder(block.InputPlaceholder)
+		e.SetMinRowsVisible(block.TextareaRows)
+		return container.NewPadded(e)
+	}
+	return nil
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+func segmentToRichStyle(seg engine.RichSegment) widget.RichTextStyle {
+	style := widget.RichTextStyle{Inline: true}
 	switch seg.Style {
 	case engine.StyleBold:
 		style.TextStyle.Bold = true
@@ -235,8 +587,6 @@ func segmentToRichStyle(seg engine.RichSegment) widget.RichTextStyle {
 		style.TextStyle.Monospace = true
 	case engine.StyleSmall:
 		style.TextStyle.Italic = true
-	case engine.StyleListItem, engine.StyleOrderedItem:
-		// normal
 	case engine.StyleTableHeader:
 		style.TextStyle.Bold = true
 	case engine.StyleLink:
@@ -244,8 +594,6 @@ func segmentToRichStyle(seg engine.RichSegment) widget.RichTextStyle {
 	case engine.StyleImage:
 		style.TextStyle.Italic = true
 	}
-
-	// Overlay CSS calculé (priorité sur le style tag)
 	if seg.Bold {
 		style.TextStyle.Bold = true
 	}
@@ -255,9 +603,6 @@ func segmentToRichStyle(seg engine.RichSegment) widget.RichTextStyle {
 	if seg.Mono {
 		style.TextStyle.Monospace = true
 	}
-	// Note: couleurs CSS inline non appliquées ici (widget.RichTextStyle sans Color).
-	// Les couleurs de blocs (headings, p avec bg) sont gérées via canvas.NewText/Rectangle.
-
 	return style
 }
 
