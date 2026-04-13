@@ -93,6 +93,10 @@ func (gr *guiRenderer) render(el *Element) {
 	if guiSkipTags[el.Tag] {
 		return
 	}
+	// Élément masqué par JS (display:none ou hidden=true)
+	if el.Attrs != nil && el.Attrs["data-fox-hidden"] == "true" {
+		return
+	}
 
 	switch el.Tag {
 	case "h1":

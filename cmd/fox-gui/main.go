@@ -25,6 +25,7 @@ import (
 	"github.com/51TH-FireFox13/fox-browser/internal/engine"
 	"github.com/51TH-FireFox13/fox-browser/internal/foxchain"
 	"github.com/51TH-FireFox13/fox-browser/internal/foxota"
+	"github.com/51TH-FireFox13/fox-browser/internal/jsengine"
 	"github.com/51TH-FireFox13/fox-browser/internal/network"
 )
 
@@ -57,11 +58,12 @@ type FoxTab struct {
 
 // FoxGUI est l'application principale.
 type FoxGUI struct {
-	app     fyne.App
-	window  fyne.Window
-	client  *network.Client
-	guard   *aiguard.Guard
-	profile *foxchain.Profile
+	app      fyne.App
+	window   fyne.Window
+	client   *network.Client
+	guard    *aiguard.Guard
+	jsEngine *jsengine.Engine
+	profile  *foxchain.Profile
 
 	// Barre de navigation (partagée entre onglets)
 	urlEntry    *widget.Entry
@@ -94,9 +96,10 @@ type FoxGUI struct {
 
 func main() {
 	fox := &FoxGUI{
-		client:  network.NewClient(),
-		guard:   aiguard.NewGuard(0.7),
-		foxTabs: make([]*FoxTab, 0, 8),
+		client:   network.NewClient(),
+		guard:    aiguard.NewGuard(0.7),
+		jsEngine: jsengine.New(jsengine.DefaultConfig()),
+		foxTabs:  make([]*FoxTab, 0, 8),
 	}
 
 	fox.app = app.NewWithID("fr.fox-browser")
@@ -1066,19 +1069,52 @@ func (f *FoxGUI) navigateInTab(tab *FoxTab, input string, addHistory bool) {
 			return
 		}
 
-		// Rendu structuré GUI
-		guiResult := engine.RenderForGUI(doc)
-
-		// Extraire le titre de la page
+		// Extraire le titre HTML initial
 		pageTitle := extractTitle(doc)
 		if pageTitle == "" {
-			parsed, err := url.Parse(tab.pageURL)
-			if err == nil {
+			if parsed, err2 := url.Parse(tab.pageURL); err2 == nil {
 				pageTitle = parsed.Hostname()
 			} else {
 				pageTitle = tab.pageURL
 			}
 		}
+
+		// ── JavaScript Engine ──
+		// Exécuter les scripts inline seulement si la page n'est pas bloquée
+		if !guardResult.Blocked {
+			scripts := aiguard.ExtractScripts(resp.Body)
+			if len(scripts) > 0 {
+				jsResult := f.jsEngine.Execute(scripts, tab.pageURL, doc)
+
+				// Redirect JS (window.location.href = '...')
+				if jsResult.Redirect != "" && addHistory {
+					f.navigateInTab(tab, jsResult.Redirect, true)
+					return
+				}
+
+				// Titre modifié par document.title = '...'
+				if jsResult.Title != "" {
+					pageTitle = jsResult.Title
+				}
+
+				// Appliquer les mutations DOM avant le rendu final
+				if len(jsResult.Changes) > 0 {
+					jsengine.ApplyChanges(doc, jsResult.Changes)
+				}
+
+				// Afficher les infos JS dans la barre de statut
+				if f.currentFoxTab() == tab && jsResult.Executed > 0 {
+					extra := fmt.Sprintf(" | JS: %d scripts", jsResult.Executed)
+					if len(jsResult.Changes) > 0 {
+						extra += fmt.Sprintf(", %d mutations", len(jsResult.Changes))
+					}
+					f.statusLabel.SetText(f.statusLabel.Text + extra)
+				}
+			}
+		}
+
+		// Rendu structuré GUI (après mutations JS)
+		guiResult := engine.RenderForGUI(doc)
 
 		// Mettre à jour le contenu de l'onglet
 		pageView := buildPageView(guiResult, func(linkURL string) {

@@ -38,5 +38,6 @@ coverage.out
 # Environment
 .env
 .env.*
-fox-gui
-fox-sign
+/fox-gui
+/fox-gui-v*
+/fox-sign
