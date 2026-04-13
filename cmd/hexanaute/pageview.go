@@ -14,6 +14,32 @@ import (
 	"github.com/51TH-FireFox13/hexanaute/internal/engine"
 )
 
+// ── tappableBlock : wrapper cliquable autour de n'importe quel widget ────────
+
+type tappableBlock struct {
+	widget.BaseWidget
+	content  fyne.CanvasObject
+	onTapped func()
+}
+
+func newTappableBlock(content fyne.CanvasObject, onTapped func()) *tappableBlock {
+	t := &tappableBlock{content: content, onTapped: onTapped}
+	t.ExtendBaseWidget(t)
+	return t
+}
+
+func (t *tappableBlock) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(t.content)
+}
+
+func (t *tappableBlock) Tapped(*fyne.PointEvent) {
+	if t.onTapped != nil {
+		t.onTapped()
+	}
+}
+
+func (t *tappableBlock) TappedSecondary(*fyne.PointEvent) {}
+
 // PageViewConfig regroupe les callbacks nécessaires au rendu d'une page.
 type PageViewConfig struct {
 	OnLinkClick  func(url string)
@@ -111,63 +137,43 @@ func renderParagraph(block engine.GUIBlock, onLinkClick func(string), indent int
 		return nil
 	}
 
-	// Vérifier si le paragraphe contient des liens
-	hasLinks := false
+	// Tous les segments → RichText (texte wrappé, liens stylés en primary + [n])
+	richSegs := make([]widget.RichTextSegment, 0, len(block.Segments))
+	var firstLinkURL string
 	for _, seg := range block.Segments {
+		if seg.Text == "" {
+			continue
+		}
 		if seg.Link != "" {
-			hasLinks = true
-			break
-		}
-	}
-
-	var obj fyne.CanvasObject
-	if hasLinks && onLinkClick != nil {
-		// Rendu mixte : texte + boutons-liens dans un HBox
-		items := make([]fyne.CanvasObject, 0, len(block.Segments))
-		for _, seg := range block.Segments {
-			if seg.Text == "" {
-				continue
+			if firstLinkURL == "" {
+				firstLinkURL = seg.Link
 			}
-			if seg.Link != "" {
-				linkURL := seg.Link
-				btn := widget.NewButton(fmt.Sprintf("%s [%d]", seg.Text, seg.LinkID), func() {
-					onLinkClick(linkURL)
-				})
-				btn.Importance = widget.LowImportance
-				items = append(items, btn)
-			} else {
-				lbl := widget.NewLabel(seg.Text)
-				if seg.Bold {
-					lbl.TextStyle.Bold = true
-				}
-				if seg.Italic {
-					lbl.TextStyle.Italic = true
-				}
-				items = append(items, lbl)
-			}
-		}
-		if len(items) == 0 {
-			return nil
-		}
-		obj = container.NewHBox(items...)
-	} else {
-		// Pas de liens : rendu RichText classique
-		richSegs := make([]widget.RichTextSegment, 0, len(block.Segments))
-		for _, seg := range block.Segments {
-			if seg.Text == "" {
-				continue
-			}
+			richSegs = append(richSegs, &widget.TextSegment{
+				Text: fmt.Sprintf("%s [%d]", seg.Text, seg.LinkID),
+				Style: widget.RichTextStyle{
+					Inline:    true,
+					ColorName: "primary",
+				},
+			})
+		} else {
 			richSegs = append(richSegs, &widget.TextSegment{
 				Text:  seg.Text,
 				Style: segmentToRichStyle(seg),
 			})
 		}
-		if len(richSegs) == 0 {
-			return nil
-		}
-		rt := widget.NewRichText(richSegs...)
-		rt.Wrapping = fyne.TextWrapWord
-		obj = rt
+	}
+	if len(richSegs) == 0 {
+		return nil
+	}
+
+	rt := widget.NewRichText(richSegs...)
+	rt.Wrapping = fyne.TextWrapWord
+
+	// Rendre le bloc tappable si le paragraphe contient au moins un lien
+	var obj fyne.CanvasObject = rt
+	if firstLinkURL != "" && onLinkClick != nil {
+		linkURL := firstLinkURL
+		obj = newTappableBlock(rt, func() { onLinkClick(linkURL) })
 	}
 
 	if indent > 0 {
