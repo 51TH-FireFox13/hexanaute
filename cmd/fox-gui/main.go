@@ -999,11 +999,35 @@ func (f *FoxGUI) navigateInTab(tab *FoxTab, input string, addHistory bool) {
 	}
 
 	go func() {
+		// Cleanup toujours exécuté (LIFO : s'exécute en second)
 		defer func() {
 			tab.loading = false
 			tab.cancel = nil
 			if f.currentFoxTab() == tab {
 				f.stopBtn.Disable()
+			}
+		}()
+		// Panic recovery (LIFO : s'exécute EN PREMIER — attrape tout crash)
+		defer func() {
+			if r := recover(); r != nil {
+				errMsg := fmt.Sprintf("%v", r)
+				// Log dans un fichier pour diagnostic
+				if logF, err := os.OpenFile(
+					filepath.Join(os.TempDir(), "fox-crash.log"),
+					os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644,
+				); err == nil {
+					fmt.Fprintf(logF, "[%s] PANIC navigateInTab(%s): %v\n",
+						time.Now().Format(time.RFC3339), pageURL, r)
+					logF.Close()
+				}
+				f.setTabTitle(tab, "Erreur")
+				f.guardLabel.SetText("[AI Guard] Erreur interne")
+				if f.currentFoxTab() == tab {
+					dialog.ShowError(
+						fmt.Errorf("Erreur lors du chargement :\n%s\n\nLog : %s",
+							errMsg, filepath.Join(os.TempDir(), "fox-crash.log")),
+						f.window)
+				}
 			}
 		}()
 

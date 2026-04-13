@@ -113,9 +113,10 @@ func ParseDeclarations(text string) map[string]string {
 		}
 		prop := strings.TrimSpace(strings.ToLower(decl[:colon]))
 		value := strings.TrimSpace(decl[colon+1:])
-		// Retirer !important
-		value = strings.TrimSuffix(value, "!important")
-		value = strings.TrimSpace(value)
+		// Retirer !important (avec ou sans espace avant : "red !important" ou "red!important")
+		if idx := strings.Index(value, "!important"); idx >= 0 {
+			value = strings.TrimSpace(value[:idx])
+		}
 		if prop != "" && value != "" {
 			props[prop] = value
 		}
