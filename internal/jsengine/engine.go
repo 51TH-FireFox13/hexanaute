@@ -1,4 +1,4 @@
-// Package jsengine implémente le moteur JavaScript de Fox Browser.
+// Package jsengine implémente le moteur JavaScript de HexaNaute.
 //
 // Basé sur Goja (ECMAScript 5.1 + ES2020 partiel) en Go pur.
 // Aucune dépendance V8/Node/SpiderMonkey — souveraineté totale.
@@ -18,7 +18,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/engine"
+	"github.com/51TH-FireFox13/hexanaute/internal/engine"
 )
 
 // Config configure le moteur JavaScript.
@@ -60,7 +60,7 @@ type ExecResult struct {
 	TimedOut bool
 }
 
-// Engine est le moteur JavaScript souverain de Fox Browser.
+// Engine est le moteur JavaScript souverain de HexaNaute.
 type Engine struct {
 	config Config
 }

@@ -28,7 +28,7 @@ type Response struct {
 	Duration    time.Duration
 }
 
-// Client est le client HTTP de Fox Browser.
+// Client est le client HTTP de HexaNaute.
 type Client struct {
 	http *http.Client
 	jar  *cookiejar.Jar
@@ -69,7 +69,7 @@ func (c *Client) FetchWithContext(ctx context.Context, rawURL string) (*Response
 		return nil, fmt.Errorf("requête invalide: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "FoxBrowser/0.1.0 (Renard; souverain)")
+	req.Header.Set("User-Agent", "HexaNaute/0.4.0 (fr; souverain)")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.5")
 	req.Header.Set("DNT", "1")

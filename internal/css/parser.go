@@ -1,4 +1,4 @@
-// Package css implémente un moteur CSS basique pour Fox Browser.
+// Package css implémente un moteur CSS basique pour HexaNaute.
 // Objectif : souveraineté visuelle — appliquer les styles sans dépendance GAFAM.
 //
 // Supporte :

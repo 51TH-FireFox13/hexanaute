@@ -1,4 +1,4 @@
-// Ressources Windows pour Fox Browser
+// Ressources Windows pour HexaNaute
 // Embarqué dans l'exe via windres
 
 #include <winver.h>
@@ -8,8 +8,8 @@ IDI_ICON1 ICON "icons/fox.ico"
 
 // Métadonnées version
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     0,3,0,0
-PRODUCTVERSION  0,3,0,0
+FILEVERSION     0,4,0,0
+PRODUCTVERSION  0,4,0,0
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEFLAGS       0
 FILEOS          VOS_NT_WINDOWS32
@@ -20,14 +20,14 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName",      "Fox Browser Project\0"
-            VALUE "FileDescription",  "Fox Browser — Navigateur souverain\0"
-            VALUE "FileVersion",      "0.3.0\0"
-            VALUE "InternalName",     "fox-gui\0"
+            VALUE "CompanyName",      "HexaRelay\0"
+            VALUE "FileDescription",  "HexaNaute — Navigateur souverain\0"
+            VALUE "FileVersion",      "0.4.0\0"
+            VALUE "InternalName",     "hexanaute\0"
             VALUE "LegalCopyright",   "Licence MIT\0"
-            VALUE "OriginalFilename", "fox-gui.exe\0"
-            VALUE "ProductName",      "Fox Browser\0"
-            VALUE "ProductVersion",   "0.3.0\0"
+            VALUE "OriginalFilename", "hexanaute.exe\0"
+            VALUE "ProductName",      "HexaNaute\0"
+            VALUE "ProductVersion",   "0.4.0\0"
         END
     END
     BLOCK "VarFileInfo"

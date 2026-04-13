@@ -1,6 +1,6 @@
 // Package foxota — module P2P pour la distribution décentralisée des mises à jour.
 //
-// Chaque instance Fox Browser peut servir de nœud de distribution.
+// Chaque instance HexaNaute peut servir de nœud de distribution.
 // Les binaires sont vérifiés par hash SHA-256 (dans le manifest signé)
 // quel que soit le pair source — aucune confiance n'est requise envers les pairs.
 //

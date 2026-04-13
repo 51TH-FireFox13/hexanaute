@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/foxota"
+	"github.com/51TH-FireFox13/hexanaute/internal/foxota"
 )
 
 func main() {

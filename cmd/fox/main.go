@@ -11,17 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/aiguard"
-	"github.com/51TH-FireFox13/fox-browser/internal/browser"
-	"github.com/51TH-FireFox13/fox-browser/internal/engine"
-	"github.com/51TH-FireFox13/fox-browser/internal/foxchain"
-	"github.com/51TH-FireFox13/fox-browser/internal/foxota"
-	"github.com/51TH-FireFox13/fox-browser/internal/network"
-	"github.com/51TH-FireFox13/fox-browser/internal/ui"
+	"github.com/51TH-FireFox13/hexanaute/internal/aiguard"
+	"github.com/51TH-FireFox13/hexanaute/internal/browser"
+	"github.com/51TH-FireFox13/hexanaute/internal/engine"
+	"github.com/51TH-FireFox13/hexanaute/internal/foxchain"
+	"github.com/51TH-FireFox13/hexanaute/internal/foxota"
+	"github.com/51TH-FireFox13/hexanaute/internal/network"
+	"github.com/51TH-FireFox13/hexanaute/internal/ui"
 )
 
 const (
-	version    = "0.0.4"
+	version    = "0.4.0"
 	versionNum = 4 // numéro monotone croissant pour anti-downgrade
 
 	// Clé publique de signature des releases (sera générée avec fox-sign genkey)
@@ -472,14 +472,14 @@ func cmdCheckUpdate() {
 	checker := foxota.NewChecker(pubKeyBytes, versionNum, "stable")
 
 	// Sources de vérification (à configurer avec vos URLs)
-	checker.AddSource("github", "https://raw.githubusercontent.com/51TH-FireFox13/fox-browser/main/releases/manifest.json")
-	checker.AddSource("mirror-1", "https://fox-browser.fr/releases/manifest.json")
+	checker.AddSource("github", "https://raw.githubusercontent.com/51TH-FireFox13/hexanaute/main/releases/manifest.json")
+	checker.AddSource("mirror-1", "https://hexanaute.fr/releases/manifest.json")
 
 	result := checker.Check()
 
 	if result.Error != nil {
 		if result.Error == foxota.ErrNoUpdate {
-			fmt.Printf("[FoxOTA] ✓ Fox Browser v%s est à jour.\n", version)
+			fmt.Printf("[FoxOTA] ✓ HexaNaute v%s est à jour.\n", version)
 		} else {
 			fmt.Printf("[FoxOTA] Erreur : %s\n", result.Error)
 		}
@@ -602,7 +602,7 @@ func normalizeURL(input string) string {
 }
 
 func printVersion() {
-	fmt.Printf("Fox Browser v%s (Renard)\n", version)
+	fmt.Printf("HexaNaute v%s (Renard)\n", version)
 	fmt.Printf("OS: %s | Arch: %s | Go: %s\n", runtime.GOOS, runtime.GOARCH, runtime.Version())
 	fmt.Printf("CPUs: %d\n", runtime.NumCPU())
 }

@@ -1,4 +1,4 @@
-// Package engine implémente le moteur de rendu HTML de Fox Browser.
+// Package engine implémente le moteur de rendu HTML de HexaNaute.
 package engine
 
 import (

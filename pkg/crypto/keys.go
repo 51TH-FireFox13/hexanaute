@@ -1,4 +1,4 @@
-// Package crypto fournit les primitives cryptographiques de Fox Browser.
+// Package crypto fournit les primitives cryptographiques de HexaNaute.
 // XChaCha20-Poly1305 pour le chiffrement, Ed25519 pour les signatures,
 // Argon2id pour la dérivation de clé depuis une passphrase.
 package crypto

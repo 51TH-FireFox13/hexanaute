@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	foxcrypto "github.com/51TH-FireFox13/fox-browser/pkg/crypto"
+	foxcrypto "github.com/51TH-FireFox13/hexanaute/pkg/crypto"
 )
 
 // ProfileMeta contient les métadonnées du profil (non chiffrées).

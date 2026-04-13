@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/browser"
+	"github.com/51TH-FireFox13/hexanaute/internal/browser"
 )
 
 const (
@@ -34,7 +34,7 @@ func StatusBar(url string, status int, tls string, duration string) {
 		statusColor = colorRed
 	}
 
-	fmt.Printf("\n%s┌─── Fox Browser ──────────────────────────────────────┐%s\n", colorCyan, colorReset)
+	fmt.Printf("\n%s┌─── HexaNaute ──────────────────────────────────────┐%s\n", colorCyan, colorReset)
 	fmt.Printf("%s│%s %s %s%s%s", colorCyan, colorReset, lock, colorBold, url, colorReset)
 	padding := 51 - len(url) - 4
 	if padding < 0 {
@@ -204,7 +204,7 @@ func HelpFull() {
   %supdate%s           Vérifier les mises à jour (OTA signé)
 
 %sQuitter:%s
-  %sq%s / %squitter%s      Fermer Fox Browser
+  %sq%s / %squitter%s      Fermer HexaNaute
 `, colorBold, colorReset,
 		colorCyan, colorReset,
 		colorCyan, colorReset,

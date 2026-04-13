@@ -1,4 +1,4 @@
-module github.com/51TH-FireFox13/fox-browser
+module github.com/51TH-FireFox13/hexanaute
 
 go 1.25.7
 

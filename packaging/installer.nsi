@@ -1,16 +1,16 @@
 ; ============================================================
-;  Fox Browser — Script d'installation NSIS
-;  Génère : FoxBrowser-Setup-v0.3.0.exe
+;  HexaNaute — Script d'installation NSIS
+;  Génère : HexaNaute-Setup-v0.4.0.exe
 ; ============================================================
 
 Unicode True
 SetCompressor /SOLID lzma
 
 ; --- Infos générales ---
-Name              "Fox Browser"
-OutFile           "FoxBrowser-Setup-v0.3.0.exe"
-InstallDir        "$PROGRAMFILES64\FoxBrowser"
-InstallDirRegKey  HKLM "Software\FoxBrowser" "InstallDir"
+Name              "HexaNaute"
+OutFile           "HexaNaute-Setup-v0.4.0.exe"
+InstallDir        "$PROGRAMFILES64\HexaNaute"
+InstallDirRegKey  HKLM "Software\HexaNaute" "InstallDir"
 RequestExecutionLevel admin
 
 ; --- Icône de l'installeur ---
@@ -18,13 +18,13 @@ Icon              "..\assets\icons\fox.ico"
 UninstallIcon     "..\assets\icons\fox.ico"
 
 ; --- Infos affichées dans les propriétés ---
-VIProductVersion  "0.3.0.0"
-VIAddVersionKey   "ProductName"      "Fox Browser"
-VIAddVersionKey   "ProductVersion"   "0.3.0"
-VIAddVersionKey   "FileDescription"  "Installeur Fox Browser"
-VIAddVersionKey   "CompanyName"      "Fox Browser Project"
+VIProductVersion  "0.4.0.0"
+VIAddVersionKey   "ProductName"      "HexaNaute"
+VIAddVersionKey   "ProductVersion"   "0.4.0"
+VIAddVersionKey   "FileDescription"  "Installeur HexaNaute"
+VIAddVersionKey   "CompanyName"      "HexaRelay"
 VIAddVersionKey   "LegalCopyright"   "Licence MIT"
-VIAddVersionKey   "FileVersion"      "0.3.0"
+VIAddVersionKey   "FileVersion"      "0.4.0"
 
 ; --- Interface moderne ---
 !include "MUI2.nsh"
@@ -39,8 +39,8 @@ VIAddVersionKey   "FileVersion"      "0.3.0"
 !insertmacro MUI_PAGE_LICENSE      "..\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN          "$INSTDIR\fox-gui.exe"
-!define MUI_FINISHPAGE_RUN_TEXT     "Lancer Fox Browser"
+!define MUI_FINISHPAGE_RUN          "$INSTDIR\hexanaute.exe"
+!define MUI_FINISHPAGE_RUN_TEXT     "Lancer HexaNaute"
 !insertmacro MUI_PAGE_FINISH
 
 ; Pages de désinstallation
@@ -53,65 +53,65 @@ VIAddVersionKey   "FileVersion"      "0.3.0"
 ; ============================================================
 ;  SECTION PRINCIPALE
 ; ============================================================
-Section "Fox Browser" SecMain
+Section "HexaNaute" SecMain
     SectionIn RO   ; obligatoire
 
     SetOutPath "$INSTDIR"
 
     ; Fichier principal
-    File "..\cmd\fox-gui\fox-gui-built.exe"
-    Rename "$INSTDIR\fox-gui-built.exe" "$INSTDIR\fox-gui.exe"
+    File "..\cmd\hexanaute\hexanaute-built.exe"
+    Rename "$INSTDIR\hexanaute-built.exe" "$INSTDIR\hexanaute.exe"
 
     ; Icône (pour les raccourcis)
     SetOutPath "$INSTDIR\assets"
     File "..\assets\icons\fox.ico"
 
     ; --- Raccourci Bureau ---
-    CreateShortcut "$DESKTOP\Fox Browser.lnk" \
-        "$INSTDIR\fox-gui.exe" "" \
+    CreateShortcut "$DESKTOP\HexaNaute.lnk" \
+        "$INSTDIR\hexanaute.exe" "" \
         "$INSTDIR\assets\fox.ico" 0 \
-        SW_SHOWNORMAL "" "Navigateur souverain Fox Browser"
+        SW_SHOWNORMAL "" "Navigateur souverain HexaNaute"
 
     ; --- Raccourci Menu Démarrer ---
-    CreateDirectory "$SMPROGRAMS\Fox Browser"
-    CreateShortcut "$SMPROGRAMS\Fox Browser\Fox Browser.lnk" \
-        "$INSTDIR\fox-gui.exe" "" \
+    CreateDirectory "$SMPROGRAMS\HexaNaute"
+    CreateShortcut "$SMPROGRAMS\HexaNaute\HexaNaute.lnk" \
+        "$INSTDIR\hexanaute.exe" "" \
         "$INSTDIR\assets\fox.ico" 0 \
-        SW_SHOWNORMAL "" "Navigateur souverain Fox Browser"
-    CreateShortcut "$SMPROGRAMS\Fox Browser\Désinstaller Fox Browser.lnk" \
+        SW_SHOWNORMAL "" "Navigateur souverain HexaNaute"
+    CreateShortcut "$SMPROGRAMS\HexaNaute\Désinstaller HexaNaute.lnk" \
         "$INSTDIR\Uninstall.exe"
 
     ; --- Entrée registre (Ajout/Suppression de programmes) ---
-    WriteRegStr HKLM "Software\FoxBrowser" "InstallDir" "$INSTDIR"
-    WriteRegStr HKLM "Software\FoxBrowser" "Version"    "0.3.0"
+    WriteRegStr HKLM "Software\HexaNaute" "InstallDir" "$INSTDIR"
+    WriteRegStr HKLM "Software\HexaNaute" "Version"    "0.4.0"
 
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
-        "DisplayName"          "Fox Browser"
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
+        "DisplayName"          "HexaNaute"
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
-        "DisplayVersion"       "0.3.0"
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
+        "DisplayVersion"       "0.4.0"
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
-        "Publisher"            "Fox Browser Project"
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
+        "Publisher"            "HexaRelay"
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "DisplayIcon"          "$INSTDIR\assets\fox.ico"
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "UninstallString"      '"$INSTDIR\Uninstall.exe"'
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "QuietUninstallString" '"$INSTDIR\Uninstall.exe" /S'
     WriteRegDWORD HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "NoModify" 1
     WriteRegDWORD HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
         "NoRepair"  1
     WriteRegStr HKLM \
-        "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser" \
-        "URLInfoAbout" "https://github.com/51TH-FireFox13/fox-browser"
+        "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute" \
+        "URLInfoAbout" "https://github.com/51TH-FireFox13/hexanaute"
 
     ; Créer le désinstalleur
     WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -123,20 +123,20 @@ SectionEnd
 ; ============================================================
 Section "Uninstall"
     ; Supprimer les fichiers
-    Delete "$INSTDIR\fox-gui.exe"
+    Delete "$INSTDIR\hexanaute.exe"
     Delete "$INSTDIR\assets\fox.ico"
     Delete "$INSTDIR\Uninstall.exe"
     RMDir  "$INSTDIR\assets"
     RMDir  "$INSTDIR"
 
     ; Supprimer les raccourcis
-    Delete "$DESKTOP\Fox Browser.lnk"
-    Delete "$SMPROGRAMS\Fox Browser\Fox Browser.lnk"
-    Delete "$SMPROGRAMS\Fox Browser\Désinstaller Fox Browser.lnk"
-    RMDir  "$SMPROGRAMS\Fox Browser"
+    Delete "$DESKTOP\HexaNaute.lnk"
+    Delete "$SMPROGRAMS\HexaNaute\HexaNaute.lnk"
+    Delete "$SMPROGRAMS\HexaNaute\Désinstaller HexaNaute.lnk"
+    RMDir  "$SMPROGRAMS\HexaNaute"
 
     ; Supprimer les clés registre
-    DeleteRegKey HKLM "Software\FoxBrowser"
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FoxBrowser"
+    DeleteRegKey HKLM "Software\HexaNaute"
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\HexaNaute"
 
 SectionEnd

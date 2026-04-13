@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/engine"
+	"github.com/51TH-FireFox13/hexanaute/internal/engine"
 )
 
 // ResolveStyles applique les règles CSS à l'arbre DOM.

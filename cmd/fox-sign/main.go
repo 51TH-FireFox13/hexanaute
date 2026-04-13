@@ -1,4 +1,4 @@
-// fox-sign — Outil de signature des releases Fox Browser.
+// fox-sign — Outil de signature des releases HexaNaute.
 //
 // Usage :
 //   fox-sign genkey                      Générer une paire de clés
@@ -19,8 +19,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	foxcrypto "github.com/51TH-FireFox13/fox-browser/pkg/crypto"
-	"github.com/51TH-FireFox13/fox-browser/internal/foxota"
+	foxcrypto "github.com/51TH-FireFox13/hexanaute/pkg/crypto"
+	"github.com/51TH-FireFox13/hexanaute/internal/foxota"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Println(`fox-sign — Outil de signature des releases Fox Browser
+	fmt.Println(`fox-sign — Outil de signature des releases HexaNaute
 
 Usage :
   fox-sign genkey                          Générer une paire de clés Ed25519
@@ -130,7 +130,7 @@ func cmdRelease() {
 			continue
 		}
 		manifest.AddBinary(platform.os, platform.arch, data, filename,
-			fmt.Sprintf("https://releases.fox-browser.fr/v%s/%s", versionStr, filename))
+			fmt.Sprintf("https://releases.hexanaute.fr/v%s/%s", versionStr, filename))
 		hash := sha256.Sum256(data)
 		fmt.Printf("  ✓ %s (%d bytes, SHA-256: %s)\n", filename, len(data), hex.EncodeToString(hash[:8]))
 		found++

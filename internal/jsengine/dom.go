@@ -6,7 +6,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/51TH-FireFox13/fox-browser/internal/engine"
+	"github.com/51TH-FireFox13/hexanaute/internal/engine"
 )
 
 // setupDocument injecte l'objet document dans la VM.

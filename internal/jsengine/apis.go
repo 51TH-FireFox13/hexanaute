@@ -211,9 +211,9 @@ func setupConsole(vm *goja.Runtime, debug bool) {
 // setupNavigator injecte l'objet navigator.
 func setupNavigator(vm *goja.Runtime) {
 	nav := vm.NewObject()
-	nav.Set("userAgent", vm.ToValue("FoxBrowser/0.1.0 (Renard; souverain)"))
+	nav.Set("userAgent", vm.ToValue("HexaNaute/0.4.0 (fr; souverain)"))
 	nav.Set("appVersion", vm.ToValue("5.0 (compatible)"))
-	nav.Set("appName", vm.ToValue("Fox Browser"))
+	nav.Set("appName", vm.ToValue("HexaNaute"))
 	nav.Set("platform", vm.ToValue("Linux x86_64"))
 	nav.Set("language", vm.ToValue("fr-FR"))
 	nav.Set("languages", vm.ToValue([]string{"fr-FR", "fr", "en"}))
@@ -222,7 +222,7 @@ func setupNavigator(vm *goja.Runtime) {
 	nav.Set("doNotTrack", vm.ToValue("1"))
 	nav.Set("hardwareConcurrency", vm.ToValue(4))
 	nav.Set("maxTouchPoints", vm.ToValue(0))
-	nav.Set("vendor", vm.ToValue("Fox Browser"))
+	nav.Set("vendor", vm.ToValue("HexaNaute"))
 	nav.Set("vendorSub", vm.ToValue(""))
 	nav.Set("product", vm.ToValue("Gecko")) // pour compatibilité
 	nav.Set("productSub", vm.ToValue("20100101"))
@@ -460,8 +460,8 @@ func setupXHRStub(vm *goja.Runtime, window *goja.Object) {
 func rejectPromise(vm *goja.Runtime) goja.Value {
 	p, err := vm.RunString(`(function() {
 		return {
-			then: function(res, rej) { if(rej) try { rej(new Error('FoxBrowser: network access from JS is sandboxed')); } catch(e) {} return this; },
-			catch: function(fn) { try { fn(new Error('FoxBrowser: network access from JS is sandboxed')); } catch(e) {} return this; },
+			then: function(res, rej) { if(rej) try { rej(new Error('HexaNaute: network access from JS is sandboxed')); } catch(e) {} return this; },
+			catch: function(fn) { try { fn(new Error('HexaNaute: network access from JS is sandboxed')); } catch(e) {} return this; },
 			finally: function(fn) { if(fn) try { fn(); } catch(e) {} return this; }
 		};
 	})()`)

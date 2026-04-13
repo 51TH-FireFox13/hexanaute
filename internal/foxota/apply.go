@@ -90,7 +90,7 @@ del "%%~f0"
 		return fmt.Errorf("foxota: échec script: %w", err)
 	}
 
-	fmt.Println("[FoxOTA] Mise à jour prête. Redémarrez Fox Browser pour appliquer.")
+	fmt.Println("[FoxOTA] Mise à jour prête. Redémarrez HexaNaute pour appliquer.")
 	return nil
 }
 

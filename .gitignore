@@ -1,43 +1,25 @@
-# Binaries (root only)
-/fox
-/fox.exe
+# Binaires compilés
 *.exe
-*.dll
-*.so
-*.dylib
-
-# Build
-/build/
-/dist/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Keys (NEVER commit)
-*.pem
-*.key
-*.priv
-signing-key*
-
-# Models (too large for git)
-models/*.onnx
-models/*.bin
-
-# Test
-coverage.out
-*.test
-
-# Environment
-.env
-.env.*
-/fox-gui
-/fox-gui-v*
+*.syso
+/hexanaute
+/fox
 /fox-sign
+/fox-manifest
+
+# Build versionnés
+/cmd/hexanaute/hexanaute-built.exe
+/hexanaute-v*
+/hexanaute-v*.exe
+
+# Packaging output
+/packaging/*.exe
+
+# Données runtime
+*.key
+*.pub
+*.log
+/chain/
+/vault/
+
+# Go cache
+vendor/

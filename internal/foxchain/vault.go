@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	foxcrypto "github.com/51TH-FireFox13/fox-browser/pkg/crypto"
+	foxcrypto "github.com/51TH-FireFox13/hexanaute/pkg/crypto"
 )
 
 // Bookmark est un favori.
