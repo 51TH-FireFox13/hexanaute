@@ -105,6 +105,36 @@ func newFlowContainer(objects ...fyne.CanvasObject) *fyne.Container {
 	return container.New(flowLayout{}, objects...)
 }
 
+// ── pageScrollWidget : scroll vertical à largeur contrainte ──────────────────
+// container.NewVScroll propage la MinSize.Width de son contenu vers la fenêtre,
+// ce qui provoque l'expansion à 5760px sur bureau multi-écrans.
+// Ce widget plafonne la MinSize à 200×200 : Fyne donne ensuite la vraie largeur
+// disponible lors du layout, le contenu se redimensionne correctement.
+
+type pageScrollWidget struct {
+	widget.BaseWidget
+	inner *container.Scroll
+}
+
+func newPageScroll(content fyne.CanvasObject) *pageScrollWidget {
+	s := &pageScrollWidget{}
+	s.inner = container.NewVScroll(content)
+	s.ExtendBaseWidget(s)
+	return s
+}
+
+func (s *pageScrollWidget) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(s.inner)
+}
+
+func (s *pageScrollWidget) MinSize() fyne.Size {
+	return fyne.NewSize(200, 200)
+}
+
+func (s *pageScrollWidget) ScrollToTop() {
+	s.inner.ScrollToTop()
+}
+
 // ── PageViewConfig ────────────────────────────────────────────────────────────
 
 // PageViewConfig regroupe les callbacks nécessaires au rendu d'une page.

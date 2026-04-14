@@ -51,7 +51,7 @@ type FoxTab struct {
 	session    *browser.Session
 	links      []engine.Link
 	contentBox *fyne.Container
-	scroll     *container.Scroll
+	scroll     *pageScrollWidget
 	tabItem    *container.TabItem
 	loading    bool
 	cancel     context.CancelFunc
@@ -381,7 +381,7 @@ func (f *FoxGUI) createFoxTab(title string) *FoxTab {
 	f.tabCounter++
 
 	contentBox := container.NewVBox()
-	scroll := container.NewVScroll(contentBox)
+	scroll := newPageScroll(contentBox)
 
 	tabItem := container.NewTabItem(title, scroll)
 
